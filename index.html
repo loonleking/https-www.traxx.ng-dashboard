@@ -1,0 +1,2108 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Traxx — Logistics & Fleet Operations Dashboard</title>
+
+  <!-- Google Fonts: Montserrat & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Montserrat', 'sans-serif'],
+          },
+          colors: {
+            midnight: '#0F172A',
+            midnightLight: '#1E293B',
+            canvas: '#F8FAFC',
+            electric: '#2563EB',
+            electricHover: '#1D4ED8',
+            mint: '#10B981',
+            amber: '#F59E0B',
+            coral: '#EF4444',
+            royal: '#7C3AED',
+            pinkAccent: '#FF007A',
+          },
+          boxShadow: {
+            card: '0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.03)',
+            elevated: '0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      direction: ltr;
+      text-align: left;
+      background-color: #F8FAFC;
+      color: #0F172A;
+      font-family: 'Inter', sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    h1, h2, h3, h4, .font-metric {
+      font-family: 'Montserrat', sans-serif;
+      letter-spacing: -0.02em;
+      text-align: left;
+    }
+    p, span, div, th, td, label, input, select, button {
+      text-align: left;
+    }
+    .badge-center {
+      text-align: center;
+      justify-content: center;
+    }
+    .tabular-nums { font-variant-numeric: tabular-nums; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #F1F5F9; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+    @keyframes radarPulse {
+      0% { transform: scale(0.95); opacity: 0.75; }
+      70% { transform: scale(2.1); opacity: 0; }
+      100% { transform: scale(2.1); opacity: 0; }
+    }
+    .pulse-ring {
+      animation: radarPulse 2.2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+      transform-origin: center;
+      transform-box: fill-box;
+    }
+    @keyframes dashFlow { to { stroke-dashoffset: -36; } }
+    .corridor-flow {
+      stroke-dasharray: 6 6;
+      animation: dashFlow 1.8s linear infinite;
+    }
+    .drawer-backdrop { transition: opacity 0.25s ease; }
+    .drawer-panel { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+  </style>
+</head>
+<body dir="ltr" class="selection:bg-blue-600 selection:text-white">
+
+  <!-- Toast Notification Banner -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2.5 pointer-events-none"></div>
+
+  <!-- Main App Shell -->
+  <div class="min-h-screen flex flex-col lg:flex-row">
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="mobile-sidebar-backdrop" onclick="toggleMobileSidebar()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-40 hidden lg:hidden"></div>
+
+    <!-- Left Navigation Rail (Matches Exact Traxx Sidebar Sections + Strict LTR Icon-to-Text Proximity) -->
+    <aside id="sidebar" class="fixed lg:sticky top-0 left-0 z-50 h-screen w-64 bg-midnight text-slate-300 flex flex-col justify-between transition-all duration-300 -translate-x-full lg:translate-x-0 border-r border-slate-800 shrink-0">
+
+      <!-- Top Brand + Sidebar Search -->
+      <div class="shrink-0">
+        <div class="h-16 px-5 flex items-center justify-between border-b border-slate-800/80">
+          <div class="flex items-center gap-3 text-left">
+            <div class="w-9 h-9 rounded-xl bg-electric flex items-center justify-center shadow-lg shadow-blue-600/30 shrink-0">
+              <span class="font-display font-extrabold text-white text-sm tracking-tight">TX</span>
+            </div>
+            <div class="text-left">
+              <span class="font-display font-extrabold text-white text-lg tracking-tight leading-none block">Traxx</span>
+              <span class="text-[11px] text-slate-400 leading-none mt-1 block">Dispatch & Fleet OS</span>
+            </div>
+          </div>
+          <button onclick="toggleMobileSidebar()" class="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Sidebar Quick Search -->
+        <div class="px-4 pt-3.5 pb-2">
+          <div class="relative">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input
+              type="text"
+              oninput="filterSidebarMenu(this.value)"
+              placeholder="Search..."
+              class="w-full pl-9 pr-3 py-2 text-xs text-left bg-slate-800/80 border border-slate-700/80 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable Navigation Menu (Exact Traxx Structure) -->
+      <nav id="sidebar-nav" class="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+        <!-- WORKSPACE -->
+        <p class="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">WORKSPACE</p>
+
+        <button onclick="switchNav('overview', this)" data-nav="overview" data-label="Overview" class="nav-item active w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium bg-blue-600/20 text-white border-l-2 border-blue-500 transition-all">
+          <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 text-blue-400"></i>
+          <span class="truncate text-left">Overview</span>
+        </button>
+
+        <button onclick="switchNav('livemap', this)" data-nav="livemap" data-label="Live Map" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="map" class="w-4 h-4 shrink-0 text-emerald-400"></i>
+          <span class="truncate text-left">Live Map</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-400 ml-auto shrink-0 animate-pulse"></span>
+        </button>
+
+        <button onclick="switchNav('assignments', this)" data-nav="assignments" data-label="Assignments" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="check-square" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate text-left">Assignments</span>
+          <span id="nav-assignments-badge" class="badge-center ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 tabular-nums shrink-0">6</span>
+        </button>
+
+        <button onclick="switchNav('requests', this)" data-nav="requests" data-label="Requests" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="inbox" class="w-4 h-4 shrink-0 text-amber-400"></i>
+          <span class="truncate text-left">Requests</span>
+          <span id="nav-requests-badge" class="badge-center ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 tabular-nums shrink-0">4</span>
+        </button>
+
+        <button onclick="switchNav('notifications', this)" data-nav="notifications" data-label="Notifications" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="bell" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate text-left">Notifications</span>
+          <span id="nav-notif-badge" class="badge-center ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 tabular-nums shrink-0">3</span>
+        </button>
+
+        <!-- PEOPLE -->
+        <p class="px-3 pt-3.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">PEOPLE</p>
+
+        <button onclick="switchNav('riders', this)" data-nav="riders" data-label="Riders" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate text-left">Riders</span>
+          <span id="nav-riders-badge" class="badge-center ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 tabular-nums shrink-0">48</span>
+        </button>
+
+        <button onclick="switchNav('shifts', this)" data-nav="shifts" data-label="Shifts" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="clock" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate text-left">Shifts</span>
+        </button>
+
+        <button onclick="switchNav('vendors', this)" data-nav="vendors" data-label="Vendors" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="building-2" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate text-left">Vendors</span>
+        </button>
+
+        <!-- ANALYTICS -->
+        <p class="px-3 pt-3.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">ANALYTICS</p>
+
+        <button onclick="switchNav('reports', this)" data-nav="reports" data-label="Reports" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="bar-chart-2" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate text-left">Reports</span>
+        </button>
+
+        <!-- SETUP (Collapsible Accordion) -->
+        <p class="px-3 pt-3.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">SETUP</p>
+
+        <div class="space-y-1">
+          <button onclick="toggleSetupGroup()" class="w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium bg-slate-800/60 text-white hover:bg-slate-800 transition-all">
+            <i data-lucide="monitor" class="w-4 h-4 shrink-0 text-blue-400"></i>
+            <span class="truncate text-left">Setup</span>
+            <i id="setup-chevron" data-lucide="chevron-up" class="w-4 h-4 ml-auto text-slate-400 shrink-0 transition-transform"></i>
+          </button>
+
+          <div id="setup-submenu" class="pl-4 space-y-0.5 border-l border-slate-800 ml-5">
+            <button onclick="switchNav('booking-page', this)" data-nav="booking-page" data-label="Booking Page" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+              <i data-lucide="file-text" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate text-left">Booking Page</span>
+            </button>
+
+            <button onclick="switchNav('pricing', this)" data-nav="pricing" data-label="Pricing & Zones" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+              <i data-lucide="dollar-sign" class="w-4 h-4 shrink-0"></i>
+              <span class="truncate text-left">Pricing & Zones</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- TRAXX AI -->
+        <p class="px-3 pt-3.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">TRAXX AI</p>
+
+        <button onclick="switchNav('traxx-ai', this)" data-nav="traxx-ai" data-label="Traxx AI" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="bot" class="w-4 h-4 shrink-0 text-purple-400"></i>
+          <span class="truncate text-left">Traxx AI</span>
+        </button>
+
+        <!-- SETTINGS -->
+        <p class="px-3 pt-3.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">SETTINGS</p>
+
+        <button onclick="switchNav('settings', this)" data-nav="settings" data-label="Settings" class="nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all">
+          <i data-lucide="settings" class="w-4 h-4 shrink-0"></i>
+          <span class="truncate text-left">Settings</span>
+        </button>
+      </nav>
+
+      <!-- Bottom User Profile & Sign Out Footer (Matches Screenshot) -->
+      <div class="p-3 border-t border-slate-800 bg-slate-900/70 space-y-2.5 shrink-0">
+        <div class="flex items-center gap-3 px-2 py-1 text-left">
+          <div class="badge-center w-9 h-9 rounded-full bg-electric text-white font-display font-bold text-xs flex items-center justify-center shrink-0">
+            JO
+          </div>
+          <div class="min-w-0 text-left">
+            <p class="text-xs font-bold text-white truncate">James Oluwafemi Oj...</p>
+            <p class="text-[11px] text-slate-400 truncate">Starter Plan · Full Admin</p>
+          </div>
+        </div>
+
+        <button onclick="showToast('Session locked safely. Ready to resume dispatch.', 'info')" class="w-full flex items-center justify-start gap-2.5 px-3 py-2 rounded-xl border border-slate-800 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white transition-all">
+          <i data-lucide="log-out" class="w-4 h-4 shrink-0"></i>
+          <span>Sign out</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Workspace -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Top Command Header -->
+      <header class="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3 flex-1 min-w-0">
+          <button onclick="toggleMobileSidebar()" class="lg:hidden p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50">
+            <i data-lucide="menu" class="w-5 h-5"></i>
+          </button>
+
+          <div class="relative flex-1 max-w-md">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input
+              id="global-search"
+              type="text"
+              oninput="handleGlobalSearch(this.value)"
+              placeholder="Search waybill (TRX-89421), vendor, rider, or zone..."
+              class="w-full pl-10 pr-14 py-2 text-sm text-left bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 transition-all"
+            />
+            <kbd class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 bg-white border border-slate-200 rounded-md absolute right-2.5 top-1/2 -translate-y-1/2">⌘K</kbd>
+          </div>
+        </div>
+
+        <!-- Right Header Controls -->
+        <div class="flex items-center gap-2.5 shrink-0">
+          <!-- Full Control Figure Editor Trigger -->
+          <button onclick="openEditFiguresModal()" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-bold transition-all whitespace-nowrap">
+            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-royal shrink-0"></i>
+            <span class="hidden sm:inline">Edit Figures</span>
+          </button>
+
+          <!-- Primary CTA: Create Assignment -->
+          <button onclick="openCreateModal()" class="inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-electric hover:bg-electricHover text-white text-xs sm:text-sm font-semibold shadow-sm shadow-blue-600/20 transition-all whitespace-nowrap">
+            <i data-lucide="plus" class="w-4 h-4 shrink-0"></i>
+            <span>New Assignment</span>
+          </button>
+
+          <!-- Notification Bell -->
+          <button onclick="switchNavById('notifications')" class="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors relative">
+            <i data-lucide="bell" class="w-4 h-4"></i>
+            <span class="w-2 h-2 rounded-full bg-coral absolute top-1.5 right-1.5 ring-2 ring-white"></span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Dashboard Content Container -->
+      <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto space-y-6">
+
+        <!-- Page Title & Contextual Subheader (Zero Text Overlap Guaranteed) -->
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div class="text-left min-w-0">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <h1 id="view-title" class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">Operations Overview</h1>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Full Control Active
+              </span>
+            </div>
+            <p id="view-subtitle" class="text-xs sm:text-sm text-slate-500 mt-1.5 leading-relaxed">
+              Real-time Lagos & Interstate fleet dispatch, vendor assignments, rider shifts, and customizable operational metrics.
+            </p>
+          </div>
+
+          <!-- Quick Operator Controls Bar -->
+          <div class="flex flex-wrap items-center gap-2 shrink-0">
+            <button onclick="openEditFiguresModal()" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-all whitespace-nowrap">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5 text-royal shrink-0"></i>
+              <span>Customize KPIs</span>
+            </button>
+            <button onclick="simulateLiveTick()" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-all whitespace-nowrap">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-electric shrink-0"></i>
+              <span>Sync GPS</span>
+            </button>
+            <button onclick="exportManifestCSV()" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition-all whitespace-nowrap">
+              <i data-lucide="download" class="w-3.5 h-3.5 text-slate-500 shrink-0"></i>
+              <span>Export CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 1. OVERVIEW VIEW                                                  -->
+        <!-- ================================================================= -->
+        <div id="view-overview" class="dashboard-view space-y-6">
+          <!-- KPI Summary Row (Click any card or Edit button to change figures directly) -->
+          <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 items-stretch">
+            <!-- KPI 1 -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-card hover:shadow-md transition-shadow flex flex-col justify-between gap-4 group">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Total Assignments</span>
+                <button onclick="openEditFiguresModal()" title="Edit Figure" class="w-8 h-8 rounded-lg bg-blue-50 text-electric flex items-center justify-center shrink-0 hover:bg-blue-100">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+              <div>
+                <p id="kpi-total-assignments" class="font-metric text-2xl sm:text-3xl font-extrabold text-slate-900 tabular-nums leading-none">1,284</p>
+              </div>
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span id="kpi-trend-label" class="font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">+14.2% vs last wk</span>
+                <span class="text-slate-400">Lagos & Interstate</span>
+              </div>
+            </div>
+
+            <!-- KPI 2 -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-card hover:shadow-md transition-shadow flex flex-col justify-between gap-4">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Completed & SLA</span>
+                <button onclick="openEditFiguresModal()" title="Edit Figure" class="w-8 h-8 rounded-lg bg-emerald-50 text-mint flex items-center justify-center shrink-0 hover:bg-emerald-100">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <p id="kpi-completed-count" class="font-metric text-2xl sm:text-3xl font-extrabold text-slate-900 tabular-nums leading-none">892</p>
+                <span id="kpi-sla-rate" class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">94.6% SLA</span>
+              </div>
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span class="text-slate-500">Pending Requests: <strong id="kpi-pending-req" class="text-slate-800">4</strong></span>
+                <button onclick="switchNavById('requests')" class="font-semibold text-electric hover:underline">Review →</button>
+              </div>
+            </div>
+
+            <!-- KPI 3 -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-card hover:shadow-md transition-shadow flex flex-col justify-between gap-4">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Active Riders on Shift</span>
+                <button onclick="openEditFiguresModal()" title="Edit Figure" class="w-8 h-8 rounded-lg bg-amber-50 text-amber flex items-center justify-center shrink-0 hover:bg-amber-100">
+                  <i data-lucide="bike" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+              <div class="flex items-baseline gap-2">
+                <p id="kpi-active-riders" class="font-metric text-2xl sm:text-3xl font-extrabold text-slate-900 tabular-nums leading-none">48</p>
+                <span class="text-sm font-semibold text-slate-400">/ <span id="kpi-total-riders">54</span> Total</span>
+              </div>
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span class="text-slate-500">Active Vendors: <strong id="kpi-active-vendors" class="text-slate-800">19</strong></span>
+                <button onclick="switchNavById('shifts')" class="font-semibold text-electric hover:underline">Shifts →</button>
+              </div>
+            </div>
+
+            <!-- KPI 4 -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-card hover:shadow-md transition-shadow flex flex-col justify-between gap-4">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Gross Revenue & COD</span>
+                <button onclick="openEditFiguresModal()" title="Edit Figure" class="w-8 h-8 rounded-lg bg-purple-50 text-royal flex items-center justify-center shrink-0 hover:bg-purple-100">
+                  <i data-lucide="wallet" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+              <div>
+                <p id="kpi-gross-revenue" class="font-metric text-2xl sm:text-3xl font-extrabold text-slate-900 tabular-nums leading-none">₦4,850,200</p>
+              </div>
+              <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span class="text-slate-500">Wallet: <strong id="kpi-wallet-bal" class="text-slate-800 tabular-nums">₦642,500</strong></span>
+                <button onclick="switchNavById('reports')" class="font-semibold text-royal hover:underline">Reports →</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Middle Split: Live Map Preview (8 Cols) + SLA Velocity Chart (4 Cols) -->
+          <section class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            <!-- Map Card -->
+            <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden flex flex-col justify-between">
+              <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <div class="flex items-center gap-2.5">
+                    <h2 class="text-base font-bold text-slate-900">Live Fleet Corridor Telemetry</h2>
+                    <button onclick="switchNavById('livemap')" class="text-xs font-semibold text-electric hover:underline">Open Full Live Map →</button>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-1">Click any rider pin on the Lagos map to inspect live assignment & battery telemetry.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+                  <button onclick="filterMapRiders('all', this)" class="map-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-midnight text-white">All (6)</button>
+                  <button onclick="filterMapRiders('bike', this)" class="map-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600">Bikes</button>
+                  <button onclick="filterMapRiders('van', this)" class="map-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600">Vans</button>
+                  <button onclick="filterMapRiders('delayed', this)" class="map-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-red-50 text-coral">Delayed</button>
+                </div>
+              </div>
+
+              <div class="relative flex-1 min-h-[380px] bg-[#0B1324] overflow-hidden select-none">
+                <svg id="lagos-map-svg" class="w-full h-full min-h-[380px]" viewBox="0 0 800 440" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <pattern id="geoGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1E293B" stroke-width="0.7" stroke-opacity="0.55"/>
+                    </pattern>
+                    <linearGradient id="lagoonWater" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#0F294A"/>
+                      <stop offset="100%" stop-color="#09192F"/>
+                    </linearGradient>
+                  </defs>
+                  <rect width="800" height="440" fill="#0D172A"/>
+                  <rect width="800" height="440" fill="url(#geoGrid)"/>
+                  <path d="M 420 0 C 450 90, 490 150, 470 230 C 455 280, 380 310, 290 325 C 210 338, 120 355, 0 370 L 0 440 L 800 440 L 800 0 Z" fill="url(#lagoonWater)" opacity="0.88"/>
+                  <path d="M 355 322 C 440 305, 560 295, 795 285 L 795 375 C 630 385, 470 390, 345 378 C 325 362, 330 330, 355 322 Z" fill="#13203B" stroke="#1E3A5F" stroke-width="1.5"/>
+                  <path d="M 390 265 C 430 255, 475 262, 485 288 C 460 302, 410 304, 385 288 Z" fill="#13203B" stroke="#1E3A5F" stroke-width="1.5"/>
+                  <path d="M 270 15 L 285 130 L 305 245" fill="none" stroke="#334155" stroke-width="6" stroke-linecap="round"/>
+                  <path d="M 55 260 L 185 210 L 285 130" fill="none" stroke="#334155" stroke-width="5.5" stroke-linecap="round"/>
+                  <path d="M 315 185 C 365 205, 405 235, 425 272" fill="none" stroke="#60A5FA" stroke-width="2.5" class="corridor-flow"/>
+                  <path d="M 365 348 L 520 335 L 745 322" fill="none" stroke="#38BDF8" stroke-width="2.5" class="corridor-flow"/>
+                  <text x="80" y="235" fill="#475569" font-size="10" font-weight="700">FESTAC / MILE 2</text>
+                  <text x="230" y="235" fill="#475569" font-size="10" font-weight="700">YABA</text>
+                  <text x="385" y="212" fill="#60A5FA" font-size="9" font-weight="700">3RD MAINLAND BRIDGE</text>
+                  <text x="345" y="368" fill="#475569" font-size="10" font-weight="700">VICTORIA ISLAND</text>
+                  <text x="615" y="308" fill="#475569" font-size="10" font-weight="700">LEKKI-EPE CORRIDOR</text>
+                  <g id="map-rider-pins"></g>
+                </svg>
+
+                <!-- Floating Telemetry Card -->
+                <div id="rider-telemetry-card" class="absolute top-4 right-4 sm:top-auto sm:bottom-4 sm:right-4 w-72 sm:w-80 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200 shadow-elevated p-4 text-left"></div>
+              </div>
+            </div>
+
+            <!-- SLA Chart Card -->
+            <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-card p-6 flex flex-col justify-between gap-5">
+              <div>
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 class="text-base font-bold text-slate-900">Dispatch Velocity & SLA</h2>
+                    <p class="text-xs text-slate-500 mt-1">Scheduled vs. Completed drops</p>
+                  </div>
+                  <div class="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/70 shrink-0">
+                    <button onclick="switchChartMetric('volume', this)" class="chart-tab-btn px-2.5 py-1 text-[11px] font-semibold rounded-md bg-white text-slate-900 shadow-2xs">Volume</button>
+                    <button onclick="switchChartMetric('sla', this)" class="chart-tab-btn px-2.5 py-1 text-[11px] font-medium rounded-md text-slate-600">SLA %</button>
+                  </div>
+                </div>
+                <div class="mt-4 relative">
+                  <svg id="sla-chart-svg" class="w-full h-52 overflow-visible" viewBox="0 0 320 210"></svg>
+                </div>
+              </div>
+
+              <div class="pt-4 border-t border-slate-100 space-y-3">
+                <div class="p-3 rounded-xl bg-purple-50/70 border border-purple-200/70 flex items-start gap-2.5">
+                  <i data-lucide="bot" class="w-4 h-4 text-royal shrink-0 mt-0.5"></i>
+                  <p class="text-xs text-slate-800 leading-relaxed">
+                    <span class="font-bold text-royal">Traxx AI Insight:</span> 4 pending vendor requests can be auto-batched to Lekki riders to save ₦4,200 in fuel.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Recent Assignments Table -->
+          <section class="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Recent Assignments & Waybills</h2>
+                <p class="text-xs text-slate-500 mt-1">Click any row to inspect POD, edit figures, or reassign rider.</p>
+              </div>
+              <button onclick="switchNavById('assignments')" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-800 self-start sm:self-auto">
+                Manage All Assignments →
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-50/90 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <th class="py-3.5 pl-6 pr-3">Waybill ID</th>
+                    <th class="py-3.5 px-4">Vendor & Route</th>
+                    <th class="py-3.5 px-4">Assigned Rider</th>
+                    <th class="py-3.5 px-4">COD / Fee</th>
+                    <th class="py-3.5 px-4">Status</th>
+                    <th class="py-3.5 pl-4 pr-6">Control</th>
+                  </tr>
+                </thead>
+                <tbody id="waybill-table-body" class="divide-y divide-slate-100 text-sm"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 2. LIVE MAP VIEW (/dashboard/livemap)                             -->
+        <!-- ================================================================= -->
+        <div id="view-livemap" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Full-Screen Fleet GPS & Geofence Radar</h2>
+                <p class="text-xs text-slate-500 mt-1">Live telemetry stream for all active dispatch riders, corridor congestion, and dropoff geofences.</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button onclick="filterFullMapRiders('all', this)" class="fullmap-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-midnight text-white">All Fleets (6)</button>
+                <button onclick="filterFullMapRiders('bike', this)" class="fullmap-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600">Bikes (4)</button>
+                <button onclick="filterFullMapRiders('van', this)" class="fullmap-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600">Vans (2)</button>
+                <button onclick="filterFullMapRiders('delayed', this)" class="fullmap-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-red-50 text-coral">Delayed (1)</button>
+                <button onclick="simulateLiveTick()" class="px-4 py-1.5 rounded-xl bg-electric text-white text-xs font-semibold">Ping All GPS</button>
+              </div>
+            </div>
+
+            <!-- Interactive Live Fleet Map Canvas -->
+            <div class="relative w-full h-[460px] bg-[#0B1324] overflow-hidden select-none border-b border-slate-200">
+              <svg id="full-lagos-map-svg" class="w-full h-full" viewBox="0 0 800 440" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                  <pattern id="fullGeoGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1E293B" stroke-width="0.7" stroke-opacity="0.55"/>
+                  </pattern>
+                  <linearGradient id="fullLagoonWater" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#0F294A"/>
+                    <stop offset="100%" stop-color="#09192F"/>
+                  </linearGradient>
+                </defs>
+                <rect width="800" height="440" fill="#0D172A"/>
+                <rect width="800" height="440" fill="url(#fullGeoGrid)"/>
+                <path d="M 420 0 C 450 90, 490 150, 470 230 C 455 280, 380 310, 290 325 C 210 338, 120 355, 0 370 L 0 440 L 800 440 L 800 0 Z" fill="url(#fullLagoonWater)" opacity="0.88"/>
+                <path d="M 355 322 C 440 305, 560 295, 795 285 L 795 375 C 630 385, 470 390, 345 378 C 325 362, 330 330, 355 322 Z" fill="#13203B" stroke="#1E3A5F" stroke-width="1.5"/>
+                <path d="M 390 265 C 430 255, 475 262, 485 288 C 460 302, 410 304, 385 288 Z" fill="#13203B" stroke="#1E3A5F" stroke-width="1.5"/>
+                <path d="M 270 15 L 285 130 L 305 245" fill="none" stroke="#334155" stroke-width="6" stroke-linecap="round"/>
+                <path d="M 55 260 L 185 210 L 285 130" fill="none" stroke="#334155" stroke-width="5.5" stroke-linecap="round"/>
+                <path d="M 315 185 C 365 205, 405 235, 425 272" fill="none" stroke="#60A5FA" stroke-width="2.5" class="corridor-flow"/>
+                <path d="M 365 348 L 520 335 L 745 322" fill="none" stroke="#38BDF8" stroke-width="2.5" class="corridor-flow"/>
+                <text x="175" y="75" fill="#64748B" font-size="10" font-weight="700">IKEJA GRA HUB</text>
+                <text x="80" y="235" fill="#475569" font-size="10" font-weight="700">FESTAC / MILE 2</text>
+                <text x="230" y="235" fill="#475569" font-size="10" font-weight="700">YABA</text>
+                <text x="385" y="212" fill="#60A5FA" font-size="9" font-weight="700">3RD MAINLAND BRIDGE</text>
+                <text x="345" y="368" fill="#475569" font-size="10" font-weight="700">VICTORIA ISLAND</text>
+                <text x="615" y="308" fill="#475569" font-size="10" font-weight="700">LEKKI-EPE CORRIDOR</text>
+                <g id="full-map-rider-pins"></g>
+              </svg>
+
+              <!-- Map Legend Overlay -->
+              <div class="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-3.5 py-2.5 flex flex-wrap items-center gap-4 text-[11px] text-slate-200">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-mint"></span>En Route</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-electric"></span>Picking Up</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber"></span>Idle / Standby</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-coral"></span>Delayed</span>
+              </div>
+
+              <!-- Floating Telemetry Card on Full Map -->
+              <div id="full-rider-telemetry-card" class="absolute bottom-4 right-4 w-72 sm:w-80 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200 shadow-elevated p-4 text-left"></div>
+            </div>
+
+            <!-- Existing Fleet Corridor Cards (Preserved) -->
+            <div id="livemap-roster-bar" class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-slate-50/60"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 3. ASSIGNMENTS VIEW (/dashboard/assignments)                      -->
+        <!-- ================================================================= -->
+        <div id="view-assignments" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Dispatch Assignments & Rider Allocation</h2>
+                <p class="text-xs text-slate-500 mt-1">Reassign riders, edit COD amounts, or verify 6-digit recipient OTPs in real time.</p>
+              </div>
+              <button onclick="openCreateModal()" class="px-4 py-2 rounded-xl bg-electric text-white text-xs font-semibold">+ Create Assignment</button>
+            </div>
+            <div id="assignments-full-list" class="space-y-3"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 4. REQUESTS VIEW (/dashboard/requests)                            -->
+        <!-- ================================================================= -->
+        <div id="view-requests" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Incoming Vendor & Customer Booking Requests</h2>
+                <p class="text-xs text-slate-500 mt-1">Approve incoming pickup requests from your public Booking Page or API vendors and convert them into active assignments.</p>
+              </div>
+              <button onclick="addSampleRequest()" class="px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold">+ Simulate Incoming Request</button>
+            </div>
+            <div id="requests-list-container" class="space-y-3"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 5. NOTIFICATIONS VIEW (/dashboard/notifications)                  -->
+        <!-- ================================================================= -->
+        <div id="view-notifications" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">System Alerts & Dispatch Notification Center</h2>
+                <p class="text-xs text-slate-500 mt-1">SLA delay alerts, POD confirmations, rider shift check-ins, and vendor settlements.</p>
+              </div>
+              <button onclick="markAllNotificationsRead()" class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50">Mark All Read</button>
+            </div>
+            <div id="notifications-feed" class="divide-y divide-slate-100"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 6. RIDERS VIEW (/dashboard/riders)                                -->
+        <!-- ================================================================= -->
+        <div id="view-riders" class="dashboard-view hidden space-y-6">
+          <div class="flex items-center justify-between bg-white p-5 rounded-2xl border border-slate-200 shadow-card">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Fleet Riders Roster & Vehicle Compliance</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Add new riders, toggle online availability, or edit plate numbers and phone contacts.</p>
+            </div>
+            <button onclick="openAddRiderModal()" class="px-4 py-2 rounded-xl bg-electric text-white text-xs font-bold">+ Add Rider</button>
+          </div>
+          <div id="riders-directory-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch"></div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 7. SHIFTS VIEW (/dashboard/shifts)                                -->
+        <!-- ================================================================= -->
+        <div id="view-shifts" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Rider Shift Schedules & Hub Attendance</h2>
+                <p class="text-xs text-slate-500 mt-1">Control morning, afternoon, and night dispatch shift rosters across Lagos Mainland & Island hubs.</p>
+              </div>
+              <button onclick="addShiftSlot()" class="px-4 py-2 rounded-xl bg-electric text-white text-xs font-bold">+ Schedule Shift</button>
+            </div>
+            <div id="shifts-table-container" class="overflow-x-auto"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 8. VENDORS VIEW (/dashboard/vendors)                              -->
+        <!-- ================================================================= -->
+        <div id="view-vendors" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Merchant & Corporate Vendors Directory</h2>
+                <p class="text-xs text-slate-500 mt-1">Manage B2B e-commerce vendors, custom contract pricing tiers, and COD payout balances.</p>
+              </div>
+              <button onclick="openAddVendorModal()" class="px-4 py-2 rounded-xl bg-electric text-white text-xs font-bold">+ Register Vendor</button>
+            </div>
+            <div id="vendors-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 9. REPORTS VIEW (/dashboard/reports)                              -->
+        <!-- ================================================================= -->
+        <div id="view-reports" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Executive Logistics & Financial Reports</h2>
+                <p class="text-xs text-slate-500 mt-1">Audit rider efficiency, zone profitability, SLA compliance, and COD reconciliation ledgers.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button onclick="openEditFiguresModal()" class="px-3.5 py-2 rounded-xl bg-purple-50 text-royal text-xs font-bold">Edit Report Figures</button>
+                <button onclick="exportManifestCSV()" class="px-3.5 py-2 rounded-xl bg-midnight text-white text-xs font-semibold">Download Full Report</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p class="text-[11px] font-bold uppercase text-slate-500">Avg Delivery Time</p>
+                <p id="rep-avg-time" class="font-metric text-2xl font-extrabold text-slate-900 mt-1 tabular-nums">38 mins</p>
+              </div>
+              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p class="text-[11px] font-bold uppercase text-slate-500">First-Attempt Success</p>
+                <p id="rep-success-rate" class="font-metric text-2xl font-extrabold text-emerald-700 mt-1 tabular-nums">96.4%</p>
+              </div>
+              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p class="text-[11px] font-bold uppercase text-slate-500">Net Dispatch Margin</p>
+                <p id="rep-net-margin" class="font-metric text-2xl font-extrabold text-electric mt-1 tabular-nums">₦1,420,800</p>
+              </div>
+              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <p class="text-[11px] font-bold uppercase text-slate-500">Failed / Returned</p>
+                <p id="rep-failed-count" class="font-metric text-2xl font-extrabold text-coral mt-1 tabular-nums">12</p>
+              </div>
+            </div>
+
+            <div id="reports-breakdown-table" class="overflow-x-auto"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 10. SETUP -> BOOKING PAGE (/dashboard/booking-page)               -->
+        <!-- ================================================================= -->
+        <div id="view-booking-page" class="dashboard-view hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <!-- Left 7 Cols: Booking Page Customizer -->
+            <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-5">
+              <div class="border-b border-slate-100 pb-4">
+                <h2 class="text-base font-bold text-slate-900">Public Customer & Vendor Booking Page Builder</h2>
+                <p class="text-xs text-slate-500 mt-1">Customize your branded Traxx storefront link where vendors and customers submit delivery requests directly.</p>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-[11px] font-bold uppercase text-electric">Live Public Booking URL</p>
+                  <p id="bp-slug-url" class="text-xs font-mono font-bold text-slate-900 truncate mt-0.5">https://www.traxx.ng/book/zara-lagos-express</p>
+                </div>
+                <button onclick="copyTextValue(document.getElementById('bp-slug-url').textContent, 'Public Booking URL')" class="px-3 py-1.5 rounded-lg bg-electric text-white text-xs font-semibold shrink-0">Copy Link</button>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Storefront Headline</label>
+                  <input id="bp-headline-input" type="text" value="Zara Lagos Same-Day Express Dispatch" oninput="syncBookingPreview()" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Brand Accent Color</label>
+                  <select id="bp-color-input" onchange="syncBookingPreview()" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 bg-white">
+                    <option value="#2563EB">Electric Blue (#2563EB)</option>
+                    <option value="#10B981">Emerald Mint (#10B981)</option>
+                    <option value="#7C3AED">Royal Purple (#7C3AED)</option>
+                    <option value="#FF007A">Traxx Magenta (#FF007A)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-4 pt-1">
+                <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                  <input type="checkbox" checked class="rounded border-slate-300 text-electric" /> Enable Cash-on-Delivery (COD)
+                </label>
+                <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                  <input type="checkbox" checked class="rounded border-slate-300 text-electric" /> Require 6-Digit Recipient OTP
+                </label>
+                <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                  <input type="checkbox" checked class="rounded border-slate-300 text-electric" /> Auto-Calculate Zone Tariffs
+                </label>
+              </div>
+
+              <button onclick="showToast('Booking Page configuration published live!', 'success')" class="px-5 py-2.5 rounded-xl bg-electric text-white text-xs font-bold">
+                Publish Booking Page
+              </button>
+            </div>
+
+            <!-- Right 5 Cols: Live Mobile Checkout Preview -->
+            <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-4">
+              <span class="badge-center text-[10px] font-bold uppercase px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Live Customer Checkout Preview</span>
+              <div class="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div id="bp-preview-banner" class="p-4 bg-electric text-white">
+                  <p class="text-[10px] font-bold uppercase opacity-80">Powered by Traxx Logistics</p>
+                  <h3 id="bp-preview-title" class="text-sm font-extrabold text-white mt-0.5">Zara Lagos Same-Day Express Dispatch</h3>
+                </div>
+                <div class="p-4 space-y-3 bg-slate-50/60">
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Pickup Address</label>
+                    <input type="text" readonly value="Ikeja GRA, Lagos" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">Dropoff Zone</label>
+                    <input type="text" readonly value="Lekki Phase 1 (₦3,500 Instant Rate)" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white" />
+                  </div>
+                  <button onclick="addSampleRequest(); switchNavById('requests')" class="w-full py-2 rounded-lg bg-midnight text-white text-xs font-bold">
+                    Test Submit Customer Request →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 11. SETUP -> PRICING & ZONES (/dashboard/pricing)                 -->
+        <!-- ================================================================= -->
+        <div id="view-pricing" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Delivery Zones & Tariff Pricing Engine</h2>
+                <p class="text-xs text-slate-500 mt-1">Edit base delivery fees, per-km rates, and surge multipliers directly for any Lagos or Interstate zone.</p>
+              </div>
+              <button onclick="addPricingZone()" class="px-4 py-2 rounded-xl bg-electric text-white text-xs font-bold">+ Add Delivery Zone</button>
+            </div>
+            <div id="pricing-zones-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 12. TRAXX AI DISPATCH COPILOT                                     -->
+        <!-- ================================================================= -->
+        <div id="view-traxx-ai" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 space-y-5 max-w-4xl">
+            <div class="flex items-center gap-3 border-b border-slate-100 pb-4">
+              <div class="w-10 h-10 rounded-xl bg-purple-100 text-royal flex items-center justify-center shrink-0">
+                <i data-lucide="bot" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Traxx AI Route & Fleet Optimization Copilot</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Automated dispatch recommendations, traffic rerouting, and demand forecasting.</p>
+              </div>
+            </div>
+
+            <div id="ai-chat-feed" class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 max-h-80 overflow-y-auto">
+              <div class="p-3.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                <span class="font-bold text-royal block mb-1">Traxx AI Analyst:</span>
+                I detected heavy congestion on Third Mainland Bridge affecting Waybill <strong>TRX-89419</strong>. Reassigning Lekki-bound pending requests to riders already on Victoria Island will improve SLA completion by <strong>+4.8%</strong>.
+              </div>
+            </div>
+
+            <form onsubmit="askTraxxAI(event)" class="flex items-center gap-2.5">
+              <input id="ai-prompt-input" type="text" placeholder="Ask Traxx AI to optimize routes, assign pending requests, or forecast revenue..." class="flex-1 px-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-royal" />
+              <button type="submit" class="px-5 py-2.5 rounded-xl bg-royal hover:bg-purple-700 text-white text-xs font-bold shrink-0">Run AI Action</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 13. SETTINGS VIEW                                                 -->
+        <!-- ================================================================= -->
+        <div id="view-settings" class="dashboard-view hidden space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-card p-6 max-w-3xl space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Workspace & Account Settings</h2>
+                <p class="text-xs text-slate-500 mt-1">Manage operator profile, Starter/Enterprise plan limits, and API webhook credentials.</p>
+              </div>
+              <span class="px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-electric">Starter Plan · Admin</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Account Owner</label>
+                <input type="text" value="James Oluwafemi Ojubanire" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Company Workspace</label>
+                <input type="text" value="Traxx Lagos Operations" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Primary Dispatch Hub</label>
+                <input type="text" value="Plot 14 Isaac John Street, Ikeja GRA, Lagos" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200" />
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Live API Secret Key</label>
+                <input type="text" readonly value="trx_live_98a7f6c4e21b094d8831f2a90c" class="w-full px-3.5 py-2 text-xs font-mono bg-slate-50 rounded-xl border border-slate-200" />
+              </div>
+            </div>
+
+            <button onclick="showToast('Workspace settings saved successfully!', 'success')" class="px-5 py-2.5 rounded-xl bg-electric text-white text-xs font-bold">
+              Save Workspace Settings
+            </button>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- EDIT DASHBOARD FIGURES & KPIS MODAL (FULL CONTROL)                    -->
+  <!-- ===================================================================== -->
+  <div id="edit-figures-modal" dir="ltr" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-2xl overflow-hidden text-left">
+      <div class="px-6 py-4 bg-midnight text-white flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-bold text-white">Customize Dashboard Figures & KPIs</h3>
+          <p class="text-[11px] text-slate-300 mt-0.5">Override any operational metric, SLA percentage, or revenue figure live</p>
+        </div>
+        <button onclick="closeEditFiguresModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="saveCustomFigures(event)" class="p-6 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Total Assignments</label>
+            <input id="edit-total-assign" type="number" value="1284" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Completed Drops</label>
+            <input id="edit-comp-drops" type="number" value="892" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">SLA On-Time Rate (%)</label>
+            <input id="edit-sla-pct" type="text" value="94.6%" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Active Riders on Shift</label>
+            <input id="edit-active-riders" type="number" value="48" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Gross Revenue & COD (₦)</label>
+            <input id="edit-gross-rev" type="number" value="4850200" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Corporate Wallet (₦)</label>
+            <input id="edit-wallet-bal" type="number" value="642500" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeEditFiguresModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-electric text-white text-xs font-bold">Apply Figures Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- CREATE NEW ASSIGNMENT MODAL                                           -->
+  <!-- ===================================================================== -->
+  <div id="create-modal" dir="ltr" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-2xl overflow-hidden text-left">
+      <div class="px-6 py-4 bg-midnight text-white flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">Create & Dispatch New Assignment</h3>
+        <button onclick="closeCreateModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="submitNewShipment(event)" class="p-6 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Vendor / Sender</label>
+            <input type="text" id="new-sender" required value="Zara Lagos Flagship" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Recipient Name</label>
+            <input type="text" id="new-recipient" required placeholder="e.g. Amaka Nwosu" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Dropoff Zone & Address</label>
+          <select id="new-zone" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 bg-white">
+            <option value="Admiralty Way, Lekki Phase 1|3500">Lekki Phase 1 — Admiralty Way (₦3,500)</option>
+            <option value="Adeola Odeku, Victoria Island|3200">Victoria Island — Adeola Odeku (₦3,200)</option>
+            <option value="Isaac John Street, Ikeja GRA|2500">Ikeja GRA — Isaac John Street (₦2,500)</option>
+            <option value="Herbert Macaulay Way, Yaba|2800">Yaba — Herbert Macaulay Way (₦2,800)</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Assign Rider</label>
+            <select id="new-rider-select" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 bg-white">
+              <option value="Chinedu Okafor">Chinedu Okafor (Bike)</option>
+              <option value="Adebayo Bello">Adebayo Bello (Cargo Van)</option>
+              <option value="Musa Ibrahim">Musa Ibrahim (Bike)</option>
+              <option value="Tobi Adeyemi">Tobi Adeyemi (Bike)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">COD Value (₦)</label>
+            <input type="number" id="new-cod" value="45000" min="0" step="500" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <button type="button" onclick="closeCreateModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600">Cancel</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-electric text-white text-xs font-bold">Dispatch Now</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- SLIDE-OVER WAYBILL & ASSIGNMENT CONTROL DRAWER                        -->
+  <!-- ===================================================================== -->
+  <div id="waybill-drawer-backdrop" onclick="closeWaybillDrawer()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden opacity-0 drawer-backdrop"></div>
+  <aside id="waybill-drawer" dir="ltr" class="fixed top-0 right-0 h-full w-full max-w-md bg-white z-50 shadow-2xl border-l border-slate-200 translate-x-full drawer-panel flex flex-col text-left">
+    <div id="waybill-drawer-content" class="flex-1 flex flex-col overflow-y-auto text-left"></div>
+  </aside>
+
+  <!-- ===================================================================== -->
+  <!-- REQUEST INSPECTION & RIDER ASSIGNMENT POPUP MODAL                     -->
+  <!-- ===================================================================== -->
+  <div id="approve-request-modal" dir="ltr" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+    <div class="bg-white w-full max-w-xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden text-left">
+      <div class="px-6 py-4 bg-midnight text-white flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 id="req-modal-title" class="text-base font-bold text-white">Review & Assign Request</h3>
+            <span id="req-modal-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300">Pending Approval</span>
+          </div>
+          <p id="req-modal-subtitle" class="text-[11px] text-slate-300 mt-0.5">Inspect full shipment manifest and choose the specific dispatch rider</p>
+        </div>
+        <button onclick="closeApproveRequestModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="confirmApproveRequest(event)" class="p-6 space-y-5 max-h-[82vh] overflow-y-auto">
+        <input type="hidden" id="req-modal-id" />
+
+        <!-- Full Request Details Summary Card -->
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase block">Merchant / Vendor</span>
+              <span id="req-detail-vendor" class="font-bold text-slate-900 mt-0.5 block">—</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase block">Recipient & Phone</span>
+              <span id="req-detail-customer" class="font-bold text-slate-900 mt-0.5 block">—</span>
+            </div>
+          </div>
+
+          <div class="pt-2.5 border-t border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase block">Pickup Location</span>
+              <span id="req-detail-pickup" class="font-semibold text-slate-800 mt-0.5 block">—</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase block">Dropoff Destination</span>
+              <span id="req-detail-dropoff" class="font-semibold text-slate-800 mt-0.5 block">—</span>
+            </div>
+          </div>
+
+          <div class="pt-2.5 border-t border-slate-200/80 grid grid-cols-3 gap-3 text-xs">
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase block">Package Item</span>
+              <span id="req-detail-item" class="font-semibold text-slate-800 mt-0.5 block">—</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase block">Payment Mode</span>
+              <span id="req-detail-payment" class="font-semibold text-emerald-700 mt-0.5 block">—</span>
+            </div>
+            <div>
+              <span class="text-[11px] font-semibold text-slate-400 uppercase block">Submitted</span>
+              <span id="req-detail-time" class="font-semibold text-slate-600 mt-0.5 block">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Editable Figures Before Dispatch -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">COD Collection Value (₦)</label>
+            <input id="req-modal-cod" type="number" min="0" step="100" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Delivery Tariff Fee (₦)</label>
+            <input id="req-modal-fee" type="number" min="0" step="100" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+          </div>
+        </div>
+
+        <!-- Specific Rider Selection List -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-bold text-slate-800">Select Specific Dispatch Rider</label>
+            <span class="text-[11px] text-slate-500">Live fleet availability & corridor</span>
+          </div>
+          <div id="req-modal-rider-list" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- Dispatch Note -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Rider Dispatch Instructions (Optional)</label>
+          <input id="req-modal-note" type="text" placeholder="e.g. Call recipient 5 mins before arrival at gate..." class="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200" />
+        </div>
+
+        <div class="flex items-center justify-between gap-2.5 pt-3 border-t border-slate-100">
+          <button type="button" onclick="rejectRequestFromModal()" class="px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-coral text-xs font-bold">
+            Decline Request
+          </button>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="closeApproveRequestModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600">
+              Cancel
+            </button>
+            <button type="submit" class="px-5 py-2 rounded-xl bg-mint hover:bg-emerald-600 text-white text-xs font-bold shadow-sm">
+              Confirm & Dispatch Rider
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- APPLICATION STATE & FULL INTERACTIVE CONTROLLERS                      -->
+  <!-- ===================================================================== -->
+  <script>
+    const fleetRiders = [
+      { id: 'RDR-01', name: 'Chinedu Okafor', plate: 'LAG-482-QA', vehicleType: 'bike', vehicleLabel: 'Honda Ace 125 Bike', status: 'En Route', corridor: 'Lekki-Epe Expressway → Admiralty Way', waybill: 'TRX-89421', eta: '14 mins', battery: '92%', phone: '+234 803 441 9021', x: 565, y: 332 },
+      { id: 'RDR-02', name: 'Adebayo Bello', plate: 'LAG-910-XK', vehicleType: 'van', vehicleLabel: 'Suzuki Mini Cargo Van', status: 'Delayed', corridor: 'Third Mainland Bridge (Southbound)', waybill: 'TRX-89419', eta: '+18m Delay', battery: '78%', phone: '+234 812 773 1184', x: 375, y: 222 },
+      { id: 'RDR-03', name: 'Musa Ibrahim', plate: 'LAG-305-RT', vehicleType: 'bike', vehicleLabel: 'Bajaj Boxer BM150', status: 'Picking Up', corridor: 'Ikeja GRA → Isaac John St Hub', waybill: 'TRX-89418', eta: '8 mins', battery: '85%', phone: '+234 706 512 8830', x: 215, y: 96 },
+      { id: 'RDR-04', name: 'Tobi Adeyemi', plate: 'LAG-774-MP', vehicleType: 'bike', vehicleLabel: 'TVS HLX 150X Bike', status: 'En Route', corridor: 'Adeola Odeku, Victoria Island', waybill: 'TRX-89420', eta: '6 mins', battery: '96%', phone: '+234 809 330 4419', x: 412, y: 350 },
+      { id: 'RDR-05', name: 'Seyi Ogunleye', plate: 'LAG-118-BV', vehicleType: 'van', vehicleLabel: 'Toyota Hiace Cargo Van', status: 'En Route', corridor: 'Herbert Macaulay Way, Yaba', waybill: 'TRX-89417', eta: '22 mins', battery: '81%', phone: '+234 814 902 6612', x: 295, y: 215 },
+      { id: 'RDR-06', name: 'Emeka Eze', plate: 'LAG-652-LP', vehicleType: 'bike', vehicleLabel: 'Honda Ace 125 Bike', status: 'Idle', corridor: 'Festac Town 23 Road Standby', waybill: 'TRX-89415', eta: 'Standby', battery: '64%', phone: '+234 805 229 7401', x: 118, y: 245 }
+    ];
+
+    let waybills = [
+      { id: 'TRX-89421', customer: 'Amaka Nwosu', sender: 'Zara Lagos Flagship', route: 'Ikeja Hub → Lekki Phase 1', address: 'Plot 24 Admiralty Way, Lekki Phase 1', rider: 'Chinedu Okafor', vehicle: 'Express Bike', cod: 68500, fee: 3500, status: 'Out for Delivery', eta: '14 mins', podVerified: false },
+      { id: 'TRX-89419', customer: 'Femi Otedola-Cole', sender: 'Konga Prime Merchant', route: 'Maryland → Victoria Island', address: '14 Akin Adesola St, Victoria Island', rider: 'Adebayo Bello', vehicle: 'Mini Cargo Van', cod: 145000, fee: 5500, status: 'Action Required', eta: '+18m Delay', podVerified: false },
+      { id: 'TRX-89420', customer: 'Zainab Balogun', sender: 'Paystack Commerce Store', route: 'Yaba → Victoria Island', address: '42 Adeola Odeku, Victoria Island', rider: 'Tobi Adeyemi', vehicle: 'Express Bike', cod: 85000, fee: 3000, status: 'Delivered', eta: 'Delivered', podVerified: true },
+      { id: 'TRX-89418', customer: 'Tunde Bakare', sender: 'Slot Systems Nigeria', route: 'Ikeja GRA → Ajah', address: 'Abraham Adesanya Estate, Ajah', rider: 'Musa Ibrahim', vehicle: 'Express Bike', cod: 210000, fee: 4200, status: 'In Transit', eta: '38 mins', podVerified: false }
+    ];
+
+    let incomingRequests = [
+      { id: 'REQ-4091', vendor: 'Zara Lagos Flagship', customer: 'Chioma Eze (+234 803 551 9821)', pickup: 'Plot 14 Isaac John St, Ikeja GRA', dropoff: 'Plot 24 Admiralty Way, Lekki Phase 1', item: '2x Fashion Parcels (1.8 kg)', paymentMode: 'Pay on Delivery (COD)', cod: 42000, quote: 3500, time: '2 mins ago' },
+      { id: 'REQ-4092', vendor: 'TechPoint Gadgets', customer: 'Kunle Adebowale (+234 812 904 3310)', pickup: '12 Pepple St, Computer Village, Ikeja', dropoff: '18 Adeola Odeku, Victoria Island', item: 'Sealed Laptop Box (3.2 kg · Insured)', paymentMode: 'Pay on Delivery (COD)', cod: 185000, quote: 3200, time: '6 mins ago' },
+      { id: 'REQ-4093', vendor: 'Glow Skincare NG', customer: 'Halima Yusuf (+234 706 441 7209)', pickup: '45 Herbert Macaulay Way, Yaba Hub', dropoff: '8 Bode Thomas St, Surulere', item: 'Cosmetics Care Kit (0.9 kg)', paymentMode: 'Wallet Prepaid + COD', cod: 24500, quote: 2500, time: '11 mins ago' },
+      { id: 'REQ-4094', vendor: 'Ajah Fashion Hub', customer: 'Ngozi Okafor (+234 809 712 5540)', pickup: 'Monastery Road, Sangotedo, Ajah', dropoff: '22 Bourdillon Road, Ikoyi', item: 'Bridal Apparel Box (2.4 kg)', paymentMode: 'Pay on Delivery (COD)', cod: 65000, quote: 4000, time: '19 mins ago' }
+    ];
+
+    let shiftsData = [
+      { id: 'SHF-01', rider: 'Chinedu Okafor', hub: 'Lekki Phase 1 Hub', window: '08:00 AM – 04:00 PM', status: 'Active on Duty', drops: 14 },
+      { id: 'SHF-02', rider: 'Adebayo Bello', hub: 'Ikeja Central Hub', window: '09:00 AM – 05:00 PM', status: 'Active on Duty', drops: 9 },
+      { id: 'SHF-03', rider: 'Musa Ibrahim', hub: 'Ikeja Central Hub', window: '10:00 AM – 06:00 PM', status: 'Active on Duty', drops: 11 },
+      { id: 'SHF-04', rider: 'Emeka Eze', hub: 'Festac West Depot', window: '02:00 PM – 10:00 PM', status: 'Standby Shift', drops: 4 }
+    ];
+
+    let vendorsData = [
+      { id: 'VND-01', name: 'Zara Lagos Flagship', category: 'Fashion & Retail', monthlyOrders: 412, codBalance: 320000, tier: 'Enterprise Contract' },
+      { id: 'VND-02', name: 'Slot Systems Nigeria', category: 'Consumer Electronics', monthlyOrders: 289, codBalance: 890000, tier: 'Priority Insured' },
+      { id: 'VND-03', name: 'Glow Skincare NG', category: 'Beauty & Wellness', monthlyOrders: 194, codBalance: 145000, tier: 'Standard Same-Day' }
+    ];
+
+    let pricingZones = [
+      { id: 'ZN-01', zone: 'Zone A — Mainland Core (Ikeja, Yaba, Surulere)', baseFee: 2500, perKm: 150, eta: '35–50 mins' },
+      { id: 'ZN-02', zone: 'Zone B — Island Core (VI, Ikoyi, Lekki Phase 1)', baseFee: 3500, perKm: 200, eta: '45–65 mins' },
+      { id: 'ZN-03', zone: 'Zone C — Extended Axis (Ajah, Sangotedo, Festac)', baseFee: 4200, perKm: 220, eta: '60–90 mins' }
+    ];
+
+    let notificationsData = [
+      { id: 'NTF-01', title: 'Traffic Congestion Alert · Third Mainland Bridge', desc: 'Waybill TRX-89419 delayed by +18 mins. Vendor notified automatically.', time: '4 mins ago', unread: true },
+      { id: 'NTF-02', title: 'New Booking Request · REQ-4091', desc: 'Zara Lagos Flagship requested pickup from Ikeja GRA to Lekki Phase 1.', time: '6 mins ago', unread: true },
+      { id: 'NTF-03', title: 'COD Remittance Verified · ₦85,000', desc: 'Tobi Adeyemi completed 6-digit OTP verification for TRX-89420.', time: '14 mins ago', unread: true }
+    ];
+
+    let selectedRiderId = 'RDR-01';
+    let currentMapFilter = 'all';
+    let fullMapFilter = 'all';
+    let currentChartMode = 'volume';
+
+    // Sidebar Accordion & Search
+    function toggleSetupGroup() {
+      const sub = document.getElementById('setup-submenu');
+      const chev = document.getElementById('setup-chevron');
+      sub.classList.toggle('hidden');
+      chev.classList.toggle('rotate-180');
+    }
+
+    function filterSidebarMenu(q) {
+      const term = q.toLowerCase().trim();
+      document.querySelectorAll('#sidebar-nav .nav-item').forEach(btn => {
+        const label = (btn.getAttribute('data-label') || '').toLowerCase();
+        btn.style.display = !term || label.includes(term) ? 'flex' : 'none';
+      });
+    }
+
+    // Navigation Switcher
+    function switchNavById(section) {
+      const btn = document.querySelector(`.nav-item[data-nav="${section}"]`);
+      if (btn) switchNav(section, btn);
+    }
+
+    function switchNav(section, btn) {
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.className = 'nav-item w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all';
+      });
+      if (btn) {
+        btn.className = 'nav-item active w-full flex items-center justify-start gap-3 px-3 py-2 rounded-xl text-sm font-medium bg-blue-600/20 text-white border-l-2 border-blue-500 transition-all';
+      }
+
+      document.querySelectorAll('.dashboard-view').forEach(v => v.classList.add('hidden'));
+      const activeView = document.getElementById(`view-${section}`);
+      if (activeView) activeView.classList.remove('hidden');
+
+      const meta = {
+        overview: { title: 'Operations Overview', sub: 'Real-time Lagos & Interstate fleet dispatch, vendor assignments, rider shifts, and customizable operational metrics.' },
+        livemap: { title: 'Live Fleet Map', sub: 'Real-time GPS telemetry, rider geofences, and corridor congestion radar.' },
+        assignments: { title: 'Assignments Control', sub: 'Manage all active waybills, reassign dispatch riders, and verify Proof of Delivery.' },
+        requests: { title: 'Incoming Requests', sub: 'Approve or reject customer and vendor pickup requests and convert them into rider assignments.' },
+        notifications: { title: 'Notifications Center', sub: 'Real-time SLA alerts, rider shift check-ins, and COD payout confirmations.' },
+        riders: { title: 'Fleet Riders', sub: 'Manage dispatch riders, vehicle plates, online shift status, and direct VoIP calls.' },
+        shifts: { title: 'Rider Shifts', sub: 'Control morning, afternoon, and night shift schedules across Lagos hubs.' },
+        vendors: { title: 'Vendors Directory', sub: 'Manage registered B2B merchants, COD balances, and delivery SLA contracts.' },
+        reports: { title: 'Analytics & Reports', sub: 'Financial margin, SLA performance, and customizable executive KPI reports.' },
+        'booking-page': { title: 'Booking Page Setup', sub: 'Configure and publish your branded public customer delivery booking storefront.' },
+        pricing: { title: 'Pricing & Zones', sub: 'Edit Lagos & Interstate zone tariffs, base fees, and per-kilometer rates.' },
+        'traxx-ai': { title: 'Traxx AI Copilot', sub: 'AI-powered route optimization, automatic request batching, and congestion alerts.' },
+        settings: { title: 'Workspace Settings', sub: 'Manage your Starter/Admin account details, pickup hub address, and API keys.' }
+      };
+
+      if (section === 'livemap') {
+        renderFullMapPins();
+        renderFullSelectedRiderCard();
+        renderLiveMapRoster();
+      }
+      if (section === 'assignments') renderAssignmentsFullList();
+      if (section === 'requests') renderRequestsList();
+      if (section === 'notifications') renderNotificationsFeed();
+      if (section === 'riders') renderRidersDirectory();
+      if (section === 'shifts') renderShiftsTable();
+      if (section === 'vendors') renderVendorsGrid();
+      if (section === 'reports') renderReportsTable();
+      if (section === 'pricing') renderPricingZones();
+
+      if (window.innerWidth < 1024 && btn) toggleMobileSidebar();
+      lucide.createIcons();
+    }
+
+    // Edit Figures Modal Controllers
+    function openEditFiguresModal() {
+      const m = document.getElementById('edit-figures-modal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function closeEditFiguresModal() {
+      const m = document.getElementById('edit-figures-modal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+
+    function saveCustomFigures(e) {
+      e.preventDefault();
+      const totalAssign = parseInt(document.getElementById('edit-total-assign').value, 10) || 0;
+      const compDrops = parseInt(document.getElementById('edit-comp-drops').value, 10) || 0;
+      const slaPct = document.getElementById('edit-sla-pct').value.trim();
+      const activeRiders = parseInt(document.getElementById('edit-active-riders').value, 10) || 0;
+      const grossRev = parseInt(document.getElementById('edit-gross-rev').value, 10) || 0;
+      const walletBal = parseInt(document.getElementById('edit-wallet-bal').value, 10) || 0;
+
+      document.getElementById('kpi-total-assignments').textContent = totalAssign.toLocaleString();
+      document.getElementById('kpi-completed-count').textContent = compDrops.toLocaleString();
+      document.getElementById('kpi-sla-rate').textContent = `${slaPct} SLA`;
+      document.getElementById('kpi-active-riders').textContent = activeRiders.toLocaleString();
+      document.getElementById('nav-riders-badge').textContent = activeRiders.toLocaleString();
+      document.getElementById('kpi-gross-revenue').textContent = '₦' + grossRev.toLocaleString();
+      document.getElementById('kpi-wallet-bal').textContent = '₦' + walletBal.toLocaleString();
+
+      closeEditFiguresModal();
+      showToast('Dashboard figures updated across all KPI cards!', 'success');
+    }
+
+    // Map & Telemetry Rendering
+    function renderMapPins() {
+      const container = document.getElementById('map-rider-pins');
+      if (!container) return;
+      const visible = fleetRiders.filter(r => {
+        if (currentMapFilter === 'all') return true;
+        if (currentMapFilter === 'delayed') return r.status === 'Delayed';
+        return r.vehicleType === currentMapFilter;
+      });
+      container.innerHTML = visible.map(r => {
+        const isSel = r.id === selectedRiderId;
+        const color = r.status === 'Delayed' ? '#EF4444' : r.status === 'Picking Up' ? '#2563EB' : r.status === 'Idle' ? '#F59E0B' : '#10B981';
+        return `
+          <g transform="translate(${r.x}, ${r.y})" class="cursor-pointer" onclick="selectMapRider('${r.id}')">
+            <circle r="${isSel ? 18 : 13}" fill="${color}" opacity="0.28" class="pulse-ring"/>
+            <circle r="${isSel ? 9 : 7}" fill="${color}" stroke="#FFFFFF" stroke-width="2.2"/>
+            <g transform="translate(0, -16)">
+              <rect x="-34" y="-14" width="68" height="16" rx="4" fill="${isSel ? '#2563EB' : '#0F172A'}" stroke="${isSel ? '#93C5FD' : '#334155'}" stroke-width="1"/>
+              <text x="0" y="-3" text-anchor="middle" fill="#FFFFFF" font-size="8.5" font-weight="700" font-family="Inter">${r.name.split(' ')[0]}</text>
+            </g>
+          </g>
+        `;
+      }).join('');
+    }
+
+    function renderSelectedRiderCard() {
+      const card = document.getElementById('rider-telemetry-card');
+      if (!card) return;
+      const r = fleetRiders.find(item => item.id === selectedRiderId) || fleetRiders[0];
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="badge-center w-9 h-9 rounded-xl bg-midnight text-white font-display font-bold text-xs flex items-center justify-center shrink-0">
+              ${r.name.split(' ').map(n => n[0]).join('')}
+            </div>
+            <div class="min-w-0">
+              <h4 class="text-xs font-bold text-slate-900 truncate">${r.name} · ${r.plate}</h4>
+              <p class="text-[11px] text-slate-500 truncate mt-0.5">${r.vehicleLabel}</p>
+            </div>
+          </div>
+          <span class="badge-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-electric shrink-0">${r.status}</span>
+        </div>
+        <p class="mt-2.5 text-[11px] text-slate-600 truncate">${r.corridor}</p>
+        <div class="mt-3 flex items-center gap-2">
+          <button onclick="showToast('Calling ${r.name} (${r.phone})...', 'info')" class="flex-1 py-1.5 px-3 rounded-lg bg-midnight text-white text-[11px] font-semibold">Call Rider</button>
+          <button onclick="inspectWaybill('${r.waybill}')" class="flex-1 py-1.5 px-3 rounded-lg bg-blue-50 text-electric text-[11px] font-semibold">Inspect Drop</button>
+        </div>
+      `;
+    }
+
+    function selectMapRider(id) {
+      selectedRiderId = id;
+      renderMapPins();
+      renderSelectedRiderCard();
+    }
+
+    function filterMapRiders(filter, btn) {
+      currentMapFilter = filter;
+      document.querySelectorAll('.map-filter-btn').forEach(b => b.className = 'map-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600');
+      btn.className = 'map-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-midnight text-white';
+      renderMapPins();
+    }
+
+    function renderFullMapPins() {
+      const container = document.getElementById('full-map-rider-pins');
+      if (!container) return;
+      const visible = fleetRiders.filter(r => {
+        if (fullMapFilter === 'all') return true;
+        if (fullMapFilter === 'delayed') return r.status === 'Delayed';
+        return r.vehicleType === fullMapFilter;
+      });
+      container.innerHTML = visible.map(r => {
+        const isSel = r.id === selectedRiderId;
+        const color = r.status === 'Delayed' ? '#EF4444' : r.status === 'Picking Up' ? '#2563EB' : r.status === 'Idle' ? '#F59E0B' : '#10B981';
+        return `
+          <g transform="translate(${r.x}, ${r.y})" class="cursor-pointer" onclick="selectFullMapRider('${r.id}')">
+            <circle r="${isSel ? 18 : 13}" fill="${color}" opacity="0.28" class="pulse-ring"/>
+            <circle r="${isSel ? 9 : 7}" fill="${color}" stroke="#FFFFFF" stroke-width="2.2"/>
+            <g transform="translate(0, -16)">
+              <rect x="-36" y="-14" width="72" height="16" rx="4" fill="${isSel ? '#2563EB' : '#0F172A'}" stroke="${isSel ? '#93C5FD' : '#334155'}" stroke-width="1"/>
+              <text x="0" y="-3" text-anchor="middle" fill="#FFFFFF" font-size="8.5" font-weight="700" font-family="Inter">${r.name.split(' ')[0]} · ${r.eta}</text>
+            </g>
+          </g>
+        `;
+      }).join('');
+    }
+
+    function renderFullSelectedRiderCard() {
+      const card = document.getElementById('full-rider-telemetry-card');
+      if (!card) return;
+      const r = fleetRiders.find(item => item.id === selectedRiderId) || fleetRiders[0];
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="badge-center w-9 h-9 rounded-xl bg-midnight text-white font-display font-bold text-xs flex items-center justify-center shrink-0">
+              ${r.name.split(' ').map(n => n[0]).join('')}
+            </div>
+            <div class="min-w-0">
+              <h4 class="text-xs font-bold text-slate-900 truncate">${r.name} · ${r.plate}</h4>
+              <p class="text-[11px] text-slate-500 truncate mt-0.5">${r.vehicleLabel} · Battery ${r.battery}</p>
+            </div>
+          </div>
+          <span class="badge-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-electric shrink-0">${r.status}</span>
+        </div>
+        <p class="mt-2.5 text-[11px] text-slate-600 truncate">${r.corridor}</p>
+        <div class="mt-3 flex items-center gap-2">
+          <button onclick="showToast('Calling ${r.name} (${r.phone})...', 'info')" class="flex-1 py-1.5 px-3 rounded-lg bg-midnight text-white text-[11px] font-semibold">Call Rider</button>
+          <button onclick="inspectWaybill('${r.waybill}')" class="flex-1 py-1.5 px-3 rounded-lg bg-blue-50 text-electric text-[11px] font-semibold">Inspect Drop</button>
+        </div>
+      `;
+    }
+
+    function selectFullMapRider(id) {
+      selectedRiderId = id;
+      renderMapPins();
+      renderSelectedRiderCard();
+      renderFullMapPins();
+      renderFullSelectedRiderCard();
+      renderLiveMapRoster();
+    }
+
+    function filterFullMapRiders(filter, btn) {
+      fullMapFilter = filter;
+      document.querySelectorAll('.fullmap-filter-btn').forEach(b => b.className = 'fullmap-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 text-slate-600');
+      btn.className = 'fullmap-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-midnight text-white';
+      renderFullMapPins();
+    }
+
+    function switchChartMetric(mode, btn) {
+      currentChartMode = mode;
+      document.querySelectorAll('.chart-tab-btn').forEach(b => b.className = 'chart-tab-btn px-2.5 py-1 text-[11px] font-medium rounded-md text-slate-600');
+      btn.className = 'chart-tab-btn px-2.5 py-1 text-[11px] font-semibold rounded-md bg-white text-slate-900 shadow-2xs';
+      renderSLAChart();
+    }
+
+    // Dispatch Velocity & SLA SVG Bar/Line Chart Renderer
+    function renderSLAChart() {
+      const svg = document.getElementById('sla-chart-svg');
+      if (!svg) return;
+
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const volumeData = [
+        { scheduled: 185, completed: 176 },
+        { scheduled: 210, completed: 198 },
+        { scheduled: 195, completed: 184 },
+        { scheduled: 240, completed: 229 },
+        { scheduled: 265, completed: 251 },
+        { scheduled: 220, completed: 210 },
+        { scheduled: 175, completed: 168 }
+      ];
+      const slaData = [95.1, 94.3, 94.4, 95.4, 94.7, 95.5, 96.0];
+
+      const width = 320;
+      const height = 210;
+      const padLeft = 32;
+      const padBottom = 26;
+      const padTop = 16;
+      const chartH = height - padBottom - padTop;
+      const colW = (width - padLeft - 12) / days.length;
+
+      let markup = '';
+
+      // Horizontal Gridlines
+      [0, 0.5, 1].forEach(ratio => {
+        const y = padTop + chartH * (1 - ratio);
+        const label = currentChartMode === 'volume'
+          ? Math.round(280 * ratio)
+          : `${Math.round(80 + 20 * ratio)}%`;
+        markup += `
+          <line x1="${padLeft}" y1="${y}" x2="${width - 8}" y2="${y}" stroke="#E2E8F0" stroke-dasharray="3 3" stroke-width="1"/>
+          <text x="${padLeft - 6}" y="${y + 3}" text-anchor="end" fill="#94A3B8" font-size="9" font-family="Inter">${label}</text>
+        `;
+      });
+
+      if (currentChartMode === 'volume') {
+        volumeData.forEach((d, i) => {
+          const x = padLeft + i * colW + 6;
+          const schedH = (d.scheduled / 280) * chartH;
+          const compH = (d.completed / 280) * chartH;
+          const ySched = padTop + chartH - schedH;
+          const yComp = padTop + chartH - compH;
+
+          markup += `
+            <rect x="${x}" y="${ySched}" width="11" height="${schedH}" rx="3" fill="#CBD5E1"/>
+            <rect x="${x + 13}" y="${yComp}" width="11" height="${compH}" rx="3" fill="#2563EB"/>
+            <text x="${x + 12}" y="${height - 8}" text-anchor="middle" fill="#64748B" font-size="9.5" font-weight="600" font-family="Inter">${days[i]}</text>
+          `;
+        });
+      } else {
+        const points = slaData.map((val, i) => {
+          const x = padLeft + i * colW + colW / 2;
+          const norm = Math.max(0, Math.min(1, (val - 80) / 20));
+          const y = padTop + chartH * (1 - norm);
+          return { x, y, val, day: days[i] };
+        });
+
+        const pathD = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+        markup += `<path d="${pathD}" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+
+        points.forEach(p => {
+          markup += `
+            <circle cx="${p.x}" cy="${p.y}" r="4" fill="#10B981" stroke="#FFFFFF" stroke-width="1.5"/>
+            <text x="${p.x}" y="${p.y - 8}" text-anchor="middle" fill="#0F172A" font-size="8.5" font-weight="700" font-family="Inter">${p.val}%</text>
+            <text x="${p.x}" y="${height - 8}" text-anchor="middle" fill="#64748B" font-size="9.5" font-weight="600" font-family="Inter">${p.day}</text>
+          `;
+        });
+      }
+
+      svg.innerHTML = markup;
+    }
+
+    // Waybills & Assignments Table
+    function renderWaybillTable() {
+      const tbody = document.getElementById('waybill-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = waybills.map(w => `
+        <tr onclick="inspectWaybill('${w.id}')" class="h-[62px] hover:bg-slate-50 cursor-pointer transition-colors">
+          <td class="py-3 pl-6 pr-3 font-display font-bold text-xs text-slate-900">${w.id}</td>
+          <td class="py-3 px-4">
+            <p class="text-xs font-semibold text-slate-900">${w.route}</p>
+            <p class="text-[11px] text-slate-500">${w.sender} · ${w.customer}</p>
+          </td>
+          <td class="py-3 px-4 text-xs font-semibold text-slate-800">${w.rider}</td>
+          <td class="py-3 px-4 text-xs font-bold text-slate-900 tabular-nums">₦${w.cod.toLocaleString()} <span class="text-[11px] font-normal text-slate-400">(Fee: ₦${w.fee.toLocaleString()})</span></td>
+          <td class="py-3 px-4">
+            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-electric">${w.status}</span>
+          </td>
+          <td class="py-3 pl-4 pr-6" onclick="event.stopPropagation()">
+            <button onclick="inspectWaybill('${w.id}')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-electric bg-blue-50 hover:bg-blue-100">Edit / POD</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('nav-assignments-badge').textContent = waybills.length;
+    }
+
+    // Slide-over Inspector with Live Figure Editing
+    function inspectWaybill(id) {
+      const w = waybills.find(item => item.id === id) || waybills[0];
+      if (!w) return;
+      const content = document.getElementById('waybill-drawer-content');
+      content.innerHTML = `
+        <div class="px-6 py-4 bg-midnight text-white flex items-center justify-between">
+          <div>
+            <h3 class="font-display font-extrabold text-base text-white">${w.id} · Control Panel</h3>
+            <p class="text-xs text-slate-300 mt-0.5">${w.sender} → ${w.customer}</p>
+          </div>
+          <button onclick="closeWaybillDrawer()" class="p-1.5 rounded-lg text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+        <div class="p-6 space-y-4 flex-1">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Reassign Dispatch Rider</label>
+            <select id="drawer-rider-select" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 bg-white">
+              ${fleetRiders.map(r => `<option value="${r.name}" ${r.name === w.rider ? 'selected' : ''}>${r.name} (${r.vehicleLabel})</option>`).join('')}
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Edit COD Amount (₦)</label>
+              <input id="drawer-cod-input" type="number" value="${w.cod}" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Edit Delivery Fee (₦)</label>
+              <input id="drawer-fee-input" type="number" value="${w.fee}" class="w-full px-3.5 py-2 text-sm font-bold rounded-xl border border-slate-200 tabular-nums" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Assignment Status</label>
+            <select id="drawer-status-select" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 bg-white">
+              <option ${w.status === 'Out for Delivery' ? 'selected' : ''}>Out for Delivery</option>
+              <option ${w.status === 'In Transit' ? 'selected' : ''}>In Transit</option>
+              <option ${w.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
+              <option ${w.status === 'Action Required' ? 'selected' : ''}>Action Required</option>
+            </select>
+          </div>
+          <button onclick="saveWaybillEdits('${w.id}')" class="w-full py-2.5 px-4 rounded-xl bg-electric text-white text-xs font-bold">
+            Save Assignment Changes
+          </button>
+        </div>
+      `;
+      lucide.createIcons();
+      const backdrop = document.getElementById('waybill-drawer-backdrop');
+      const drawer = document.getElementById('waybill-drawer');
+      backdrop.classList.remove('hidden');
+      setTimeout(() => { backdrop.classList.remove('opacity-0'); drawer.classList.remove('translate-x-full'); }, 10);
+    }
+
+    function saveWaybillEdits(id) {
+      const idx = waybills.findIndex(w => w.id === id);
+      if (idx === -1) return;
+      waybills[idx].rider = document.getElementById('drawer-rider-select').value;
+      waybills[idx].cod = parseInt(document.getElementById('drawer-cod-input').value, 10) || 0;
+      waybills[idx].fee = parseInt(document.getElementById('drawer-fee-input').value, 10) || 0;
+      waybills[idx].status = document.getElementById('drawer-status-select').value;
+      renderWaybillTable();
+      renderAssignmentsFullList();
+      closeWaybillDrawer();
+      showToast(`Updated ${id} rider & financial figures!`, 'success');
+    }
+
+    function closeWaybillDrawer() {
+      const backdrop = document.getElementById('waybill-drawer-backdrop');
+      const drawer = document.getElementById('waybill-drawer');
+      backdrop.classList.add('opacity-0');
+      drawer.classList.add('translate-x-full');
+      setTimeout(() => backdrop.classList.add('hidden'), 280);
+    }
+
+    // Section Renderers for All Missing Pages
+    function renderLiveMapRoster() {
+      const box = document.getElementById('livemap-roster-bar');
+      if (!box) return;
+      box.innerHTML = fleetRiders.map(r => `
+        <div onclick="selectFullMapRider('${r.id}')" class="p-4 rounded-xl bg-white border ${r.id === selectedRiderId ? 'border-electric ring-2 ring-blue-500/15' : 'border-slate-200'} cursor-pointer hover:border-blue-300 transition-all flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-xs font-bold text-slate-900 truncate">${r.name} (${r.plate})</p>
+            <p class="text-[11px] text-slate-500 mt-0.5 truncate">${r.corridor}</p>
+            <p class="text-[10px] text-slate-400 mt-1">Waybill: <strong>${r.waybill}</strong> · Battery: ${r.battery}</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${r.status === 'Delayed' ? 'bg-red-50 text-coral' : 'bg-emerald-50 text-emerald-700'} shrink-0">${r.eta}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderAssignmentsFullList() {
+      const box = document.getElementById('assignments-full-list');
+      if (!box) return;
+      box.innerHTML = waybills.map(w => `
+        <div class="p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p class="text-xs font-bold text-slate-900">${w.id} · ${w.route}</p>
+            <p class="text-xs text-slate-500 mt-0.5">Vendor: ${w.sender} · Rider: <strong>${w.rider}</strong> · COD: ₦${w.cod.toLocaleString()}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-electric">${w.status}</span>
+            <button onclick="inspectWaybill('${w.id}')" class="px-3 py-1.5 rounded-lg bg-midnight text-white text-xs font-semibold">Edit / Reassign</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderRequestsList() {
+      const box = document.getElementById('requests-list-container');
+      if (!box) return;
+      document.getElementById('nav-requests-badge').textContent = incomingRequests.length;
+      document.getElementById('kpi-pending-req').textContent = incomingRequests.length;
+      if (incomingRequests.length === 0) {
+        box.innerHTML = `<p class="text-xs text-slate-500 py-6">All incoming requests have been approved and assigned to riders.</p>`;
+        return;
+      }
+      box.innerHTML = incomingRequests.map(req => `
+        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-display font-bold text-xs text-slate-900">${req.id}</span>
+              <span class="text-xs font-semibold text-electric">${req.vendor}</span>
+              <span class="text-[11px] text-slate-400">· ${req.time}</span>
+            </div>
+            <p class="text-xs text-slate-600 mt-1">${req.pickup} → <strong>${req.dropoff}</strong> · COD: ₦${req.cod.toLocaleString()} · Quote: ₦${req.quote.toLocaleString()}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="openApproveRequestModal('${req.id}')" class="px-3.5 py-1.5 rounded-lg bg-mint hover:bg-emerald-600 text-white text-xs font-bold transition-colors">Approve & Assign Rider</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    let selectedRequestRiderName = fleetRiders[0].name;
+
+    function openApproveRequestModal(reqId) {
+      const req = incomingRequests.find(r => r.id === reqId);
+      if (!req) return;
+
+      document.getElementById('req-modal-id').value = req.id;
+      document.getElementById('req-modal-title').textContent = `Review & Assign ${req.id}`;
+      document.getElementById('req-detail-vendor').textContent = req.vendor;
+      document.getElementById('req-detail-customer').textContent = req.customer || 'Storefront Recipient';
+      document.getElementById('req-detail-pickup').textContent = req.pickup;
+      document.getElementById('req-detail-dropoff').textContent = req.dropoff;
+      document.getElementById('req-detail-item').textContent = req.item || 'Standard Parcel';
+      document.getElementById('req-detail-payment').textContent = req.paymentMode || 'Pay on Delivery (COD)';
+      document.getElementById('req-detail-time').textContent = req.time;
+      document.getElementById('req-modal-cod').value = req.cod;
+      document.getElementById('req-modal-fee').value = req.quote;
+      document.getElementById('req-modal-note').value = '';
+
+      selectedRequestRiderName = fleetRiders[0].name;
+      renderRequestModalRiders();
+
+      const modal = document.getElementById('approve-request-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function renderRequestModalRiders() {
+      const list = document.getElementById('req-modal-rider-list');
+      if (!list) return;
+      list.innerHTML = fleetRiders.map(r => {
+        const isSelected = r.name === selectedRequestRiderName;
+        const badgeColor = r.status === 'Delayed' ? 'bg-red-50 text-coral' : r.status === 'Idle' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700';
+        return `
+          <div onclick="selectRequestModalRider('${r.name}')" class="p-3 rounded-xl border ${isSelected ? 'border-electric bg-blue-50/50 ring-2 ring-blue-500/15' : 'border-slate-200 hover:bg-slate-50'} cursor-pointer transition-all flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <input type="radio" name="chosen-rider" ${isSelected ? 'checked' : ''} class="text-electric focus:ring-electric shrink-0" />
+              <div class="min-w-0">
+                <p class="text-xs font-bold text-slate-900 truncate">${r.name} <span class="font-normal text-slate-500">(${r.plate})</span></p>
+                <p class="text-[11px] text-slate-500 truncate">${r.vehicleLabel} · ${r.corridor}</p>
+              </div>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeColor} shrink-0">${r.status}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectRequestModalRider(name) {
+      selectedRequestRiderName = name;
+      renderRequestModalRiders();
+    }
+
+    function closeApproveRequestModal() {
+      const modal = document.getElementById('approve-request-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function confirmApproveRequest(e) {
+      e.preventDefault();
+      const reqId = document.getElementById('req-modal-id').value;
+      const idx = incomingRequests.findIndex(r => r.id === reqId);
+      if (idx === -1) return;
+
+      const req = incomingRequests[idx];
+      const updatedCod = parseInt(document.getElementById('req-modal-cod').value, 10) || 0;
+      const updatedFee = parseInt(document.getElementById('req-modal-fee').value, 10) || 0;
+      const chosenRiderObj = fleetRiders.find(r => r.name === selectedRequestRiderName) || fleetRiders[0];
+      const newWaybillId = 'TRX-' + Math.floor(89500 + Math.random() * 450);
+
+      incomingRequests.splice(idx, 1);
+      waybills.unshift({
+        id: newWaybillId,
+        customer: (req.customer || 'Booking Customer').split(' (')[0],
+        sender: req.vendor,
+        route: `${req.pickup.split(',').pop().trim()} → ${req.dropoff.split(',').pop().trim()}`,
+        address: req.dropoff,
+        rider: chosenRiderObj.name,
+        vehicle: chosenRiderObj.vehicleLabel,
+        cod: updatedCod,
+        fee: updatedFee,
+        status: 'Out for Delivery',
+        eta: '32 mins',
+        podVerified: false
+      });
+
+      closeApproveRequestModal();
+      renderRequestsList();
+      renderWaybillTable();
+      renderAssignmentsFullList();
+      showToast(`Request ${reqId} converted to ${newWaybillId} & assigned to ${chosenRiderObj.name}!`, 'success');
+    }
+
+    function rejectRequestFromModal() {
+      const reqId = document.getElementById('req-modal-id').value;
+      const idx = incomingRequests.findIndex(r => r.id === reqId);
+      if (idx !== -1) {
+        incomingRequests.splice(idx, 1);
+        renderRequestsList();
+      }
+      closeApproveRequestModal();
+      showToast(`Request ${reqId} declined and vendor notified.`, 'info');
+    }
+
+    function addSampleRequest() {
+      const newReq = {
+        id: 'REQ-' + Math.floor(4100 + Math.random() * 800),
+        vendor: 'Lekki Storefront Customer',
+        customer: 'Damilola Martins (+234 802 618 4490)',
+        pickup: 'Block 4 Admiralty Way, Lekki Phase 1',
+        dropoff: '29 Saka Tinubu St, Victoria Island',
+        item: 'Express Document & Apparel Box (1.2 kg)',
+        paymentMode: 'Pay on Delivery (COD)',
+        cod: 55000,
+        quote: 3200,
+        time: 'Just now'
+      };
+      incomingRequests.unshift(newReq);
+      renderRequestsList();
+      showToast(`New customer request ${newReq.id} received!`, 'info');
+    }
+
+    function renderNotificationsFeed() {
+      const box = document.getElementById('notifications-feed');
+      if (!box) return;
+      box.innerHTML = notificationsData.map(n => `
+        <div class="py-4 flex items-start justify-between gap-4">
+          <div class="flex items-start gap-3">
+            <span class="w-2.5 h-2.5 rounded-full ${n.unread ? 'bg-electric' : 'bg-slate-300'} mt-1.5 shrink-0"></span>
+            <div>
+              <p class="text-xs font-bold text-slate-900">${n.title}</p>
+              <p class="text-xs text-slate-500 mt-0.5">${n.desc}</p>
+            </div>
+          </div>
+          <span class="text-[11px] text-slate-400 shrink-0">${n.time}</span>
+        </div>
+      `).join('');
+    }
+
+    function markAllNotificationsRead() {
+      notificationsData.forEach(n => n.unread = false);
+      document.getElementById('nav-notif-badge').textContent = '0';
+      renderNotificationsFeed();
+      showToast('All dispatch notifications marked as read.', 'success');
+    }
+
+    function renderRidersDirectory() {
+      const grid = document.getElementById('riders-directory-grid');
+      if (!grid) return;
+      grid.innerHTML = fleetRiders.map(r => `
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-card flex flex-col justify-between gap-4">
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">${r.name}</h3>
+              <p class="text-xs text-slate-500 mt-0.5">${r.vehicleLabel} · ${r.plate}</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">${r.status}</span>
+          </div>
+          <p class="text-xs text-slate-600">${r.corridor}</p>
+          <div class="flex items-center gap-2">
+            <button onclick="showToast('Calling ${r.name}...', 'info')" class="flex-1 py-2 rounded-xl bg-midnight text-white text-xs font-semibold">Call</button>
+            <button onclick="inspectWaybill('${r.waybill}')" class="flex-1 py-2 rounded-xl bg-blue-50 text-electric text-xs font-semibold">Active Drop</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openAddRiderModal() {
+      const name = `Rider #${fleetRiders.length + 1} (Damilola K.)`;
+      fleetRiders.push({
+        id: 'RDR-0' + (fleetRiders.length + 1),
+        name,
+        plate: 'LAG-884-TX',
+        vehicleType: 'bike',
+        vehicleLabel: 'Honda Ace 125 Bike',
+        status: 'En Route',
+        corridor: 'Yaba → Victoria Island',
+        waybill: 'TRX-89421',
+        eta: '15 mins',
+        battery: '100%',
+        phone: '+234 800 000 0000',
+        x: 320,
+        y: 260
+      });
+      renderRidersDirectory();
+      showToast(`${name} added to active Lagos fleet!`, 'success');
+    }
+
+    function renderShiftsTable() {
+      const box = document.getElementById('shifts-table-container');
+      if (!box) return;
+      box.innerHTML = `
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-500 font-bold uppercase">
+              <th class="py-3 pr-4">Shift ID</th>
+              <th class="py-3 px-4">Rider</th>
+              <th class="py-3 px-4">Dispatch Hub</th>
+              <th class="py-3 px-4">Shift Window</th>
+              <th class="py-3 px-4">Completed Drops</th>
+              <th class="py-3 pl-4">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            ${shiftsData.map(s => `
+              <tr>
+                <td class="py-3 pr-4 font-bold text-slate-900">${s.id}</td>
+                <td class="py-3 px-4 font-semibold text-slate-800">${s.rider}</td>
+                <td class="py-3 px-4 text-slate-600">${s.hub}</td>
+                <td class="py-3 px-4 text-slate-600 tabular-nums">${s.window}</td>
+                <td class="py-3 px-4 font-bold text-electric tabular-nums">${s.drops} drops</td>
+                <td class="py-3 pl-4"><span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">${s.status}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function addShiftSlot() {
+      shiftsData.push({
+        id: 'SHF-0' + (shiftsData.length + 1),
+        rider: 'Tobi Adeyemi',
+        hub: 'Victoria Island Hub',
+        window: '04:00 PM – 11:00 PM',
+        status: 'Scheduled',
+        drops: 0
+      });
+      renderShiftsTable();
+      showToast('Evening dispatch shift added to roster!', 'success');
+    }
+
+    function renderVendorsGrid() {
+      const grid = document.getElementById('vendors-grid');
+      if (!grid) return;
+      grid.innerHTML = vendorsData.map(v => `
+        <div class="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3">
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">${v.name}</h3>
+              <p class="text-xs text-slate-500">${v.category}</p>
+            </div>
+            <span class="px-2 py-0.5 rounded-md bg-blue-50 text-electric text-[11px] font-bold">${v.tier}</span>
+          </div>
+          <div class="flex items-center justify-between pt-2 border-t border-slate-200/70 text-xs">
+            <span>Orders: <strong>${v.monthlyOrders}</strong></span>
+            <span>COD Due: <strong class="text-emerald-700 tabular-nums">₦${v.codBalance.toLocaleString()}</strong></span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openAddVendorModal() {
+      vendorsData.push({
+        id: 'VND-0' + (vendorsData.length + 1),
+        name: 'Paystack Merchant #' + (vendorsData.length + 1),
+        category: 'E-Commerce Store',
+        monthlyOrders: 45,
+        codBalance: 120000,
+        tier: 'Standard Same-Day'
+      });
+      renderVendorsGrid();
+      showToast('New B2B vendor onboarded!', 'success');
+    }
+
+    function renderReportsTable() {
+      const box = document.getElementById('reports-breakdown-table');
+      if (!box) return;
+      box.innerHTML = `
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-500 font-bold uppercase">
+              <th class="py-3 pr-4">Corridor</th>
+              <th class="py-3 px-4">Total Shipments</th>
+              <th class="py-3 px-4">On-Time SLA</th>
+              <th class="py-3 pl-4">Gross Tariff Revenue</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr><td class="py-3 pr-4 font-bold">Lekki – Victoria Island – Ikoyi</td><td class="py-3 px-4 tabular-nums">542</td><td class="py-3 px-4 text-emerald-700 font-bold">96.2%</td><td class="py-3 pl-4 font-bold tabular-nums">₦1,897,000</td></tr>
+            <tr><td class="py-3 pr-4 font-bold">Ikeja – Maryland – Yaba</td><td class="py-3 px-4 tabular-nums">498</td><td class="py-3 px-4 text-emerald-700 font-bold">94.8%</td><td class="py-3 pl-4 font-bold tabular-nums">₦1,394,400</td></tr>
+            <tr><td class="py-3 pr-4 font-bold">Ajah – Sangotedo – Festac</td><td class="py-3 px-4 tabular-nums">244</td><td class="py-3 px-4 text-amber-700 font-bold">91.4%</td><td class="py-3 pl-4 font-bold tabular-nums">₦1,024,800</td></tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    function syncBookingPreview() {
+      const title = document.getElementById('bp-headline-input').value;
+      const color = document.getElementById('bp-color-input').value;
+      document.getElementById('bp-preview-title').textContent = title;
+      document.getElementById('bp-preview-banner').style.backgroundColor = color;
+    }
+
+    function renderPricingZones() {
+      const grid = document.getElementById('pricing-zones-grid');
+      if (!grid) return;
+      grid.innerHTML = pricingZones.map((z, idx) => `
+        <div class="p-5 rounded-2xl border border-slate-200 space-y-3">
+          <p class="text-xs font-bold text-slate-900">${z.zone}</p>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <label class="text-[11px] text-slate-500 block">Base Fare (₦)</label>
+              <input type="number" value="${z.baseFee}" onchange="pricingZones[${idx}].baseFee=Number(this.value); showToast('Zone tariff updated!', 'success')" class="w-full mt-1 px-2.5 py-1.5 font-bold rounded-lg border border-slate-200 tabular-nums" />
+            </div>
+            <div>
+              <label class="text-[11px] text-slate-500 block">Per-KM Rate (₦)</label>
+              <input type="number" value="${z.perKm}" onchange="pricingZones[${idx}].perKm=Number(this.value); showToast('Per-KM rate updated!', 'success')" class="w-full mt-1 px-2.5 py-1.5 font-bold rounded-lg border border-slate-200 tabular-nums" />
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500">Target SLA Window: <strong>${z.eta}</strong></p>
+        </div>
+      `).join('');
+    }
+
+    function addPricingZone() {
+      pricingZones.push({
+        id: 'ZN-0' + (pricingZones.length + 1),
+        zone: 'Zone D — Interstate Express (Abuja / Port Harcourt)',
+        baseFee: 5500,
+        perKm: 300,
+        eta: '24–48 hrs'
+      });
+      renderPricingZones();
+      showToast('Added new Interstate Pricing Zone!', 'success');
+    }
+
+    function askTraxxAI(e) {
+      e.preventDefault();
+      const input = document.getElementById('ai-prompt-input');
+      const q = input.value.trim();
+      if (!q) return;
+      const feed = document.getElementById('ai-chat-feed');
+      feed.innerHTML += `
+        <div class="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-slate-900"><strong>You:</strong> ${q}</div>
+        <div class="p-3.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 leading-relaxed">
+          <span class="font-bold text-royal block mb-1">Traxx AI Action Executed:</span>
+          Analyzed live Lagos corridor telemetry. Optimized rider allocation across 6 active hubs and updated estimated delivery windows.
+        </div>
+      `;
+      input.value = '';
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    // Create Assignment Modal
+    function openCreateModal() {
+      const m = document.getElementById('create-modal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+    function closeCreateModal() {
+      const m = document.getElementById('create-modal');
+      m.classList.add('hidden');
+      m.classList.remove('flex');
+    }
+    function submitNewShipment(e) {
+      e.preventDefault();
+      const sender = document.getElementById('new-sender').value.trim();
+      const recipient = document.getElementById('new-recipient').value.trim();
+      const zoneParts = document.getElementById('new-zone').value.split('|');
+      const rider = document.getElementById('new-rider-select').value;
+      const cod = parseInt(document.getElementById('new-cod').value, 10) || 0;
+      const newId = 'TRX-' + Math.floor(89500 + Math.random() * 490);
+
+      waybills.unshift({
+        id: newId,
+        customer: recipient,
+        sender,
+        route: `Central Hub → ${zoneParts[0].split(',')[1] || zoneParts[0]}`,
+        address: zoneParts[0],
+        rider,
+        vehicle: 'Express Bike',
+        cod,
+        fee: parseInt(zoneParts[1], 10) || 3500,
+        status: 'Out for Delivery',
+        eta: '35 mins',
+        podVerified: false
+      });
+      renderWaybillTable();
+      renderAssignmentsFullList();
+      closeCreateModal();
+      showToast(`Assignment ${newId} created & dispatched to ${rider}!`, 'success');
+    }
+
+    // Global Search & Utilities
+    function handleGlobalSearch(q) {
+      const term = q.toLowerCase().trim();
+      const tbody = document.getElementById('waybill-table-body');
+      if (!tbody) return;
+      const filtered = waybills.filter(w =>
+        w.id.toLowerCase().includes(term) ||
+        w.sender.toLowerCase().includes(term) ||
+        w.rider.toLowerCase().includes(term) ||
+        w.route.toLowerCase().includes(term)
+      );
+      tbody.innerHTML = filtered.map(w => `
+        <tr onclick="inspectWaybill('${w.id}')" class="h-[62px] hover:bg-slate-50 cursor-pointer">
+          <td class="py-3 pl-6 pr-3 font-display font-bold text-xs text-slate-900">${w.id}</td>
+          <td class="py-3 px-4"><p class="text-xs font-semibold text-slate-900">${w.route}</p><p class="text-[11px] text-slate-500">${w.sender} · ${w.customer}</p></td>
+          <td class="py-3 px-4 text-xs font-semibold text-slate-800">${w.rider}</td>
+          <td class="py-3 px-4 text-xs font-bold text-slate-900 tabular-nums">₦${w.cod.toLocaleString()}</td>
+          <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-electric">${w.status}</span></td>
+          <td class="py-3 pl-4 pr-6"><button class="px-3 py-1.5 rounded-lg text-xs font-semibold text-electric bg-blue-50">Edit / POD</button></td>
+        </tr>
+      `).join('');
+    }
+
+    function toggleMobileSidebar() {
+      document.getElementById('sidebar').classList.toggle('-translate-x-full');
+      document.getElementById('mobile-sidebar-backdrop').classList.toggle('hidden');
+    }
+
+    function simulateLiveTick() {
+      fleetRiders.forEach(r => {
+        if (r.status === 'En Route') {
+          r.x += (Math.random() - 0.5) * 14;
+          r.y += (Math.random() - 0.5) * 10;
+        }
+      });
+      renderMapPins();
+      renderSelectedRiderCard();
+      renderFullMapPins();
+      renderFullSelectedRiderCard();
+      renderLiveMapRoster();
+      showToast('Live GPS telemetry synced across all active riders!', 'success');
+    }
+
+    function exportManifestCSV() {
+      const rows = ['Waybill,Vendor,Route,Rider,COD,Fee,Status', ...waybills.map(w => `${w.id},"${w.sender}","${w.route}","${w.rider}",${w.cod},${w.fee},"${w.status}"`)];
+      const link = document.createElement('a');
+      link.href = encodeURI('data:text/csv;charset=utf-8,' + rows.join('\n'));
+      link.download = 'traxx-operations-report.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('Exported operations report CSV!', 'success');
+    }
+
+    function copyTextValue(val, label) {
+      const el = document.createElement('input');
+      el.value = val;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      showToast(`${label} copied to clipboard!`, 'success');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const dot = type === 'success' ? 'bg-emerald-400' : 'bg-blue-400';
+      toast.className = 'pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl bg-midnight border border-slate-700 text-white text-xs font-medium shadow-elevated transition-all duration-300';
+      toast.innerHTML = `<span class="w-2 h-2 rounded-full ${dot} shrink-0"></span><span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderMapPins();
+      renderSelectedRiderCard();
+      renderSLAChart();
+      renderWaybillTable();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>
